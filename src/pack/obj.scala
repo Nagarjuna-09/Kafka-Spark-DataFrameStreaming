@@ -23,26 +23,40 @@ object obj {
     val spark = SparkSession.builder().getOrCreate( )
     import spark.implicits._
     
-    // reads the data into a fixed unbounded input table schema 
-    // schema contains key, value, topic, partition, offset, timestamp, timestampType
+    //read stream from kafka topic "sstpk"
     val df = spark.readStream
               .format("kafka")
               .option("kafka.bootstrap.servers","localhost:9092")
               .option("subscribe","sstpk")
               .load()
               
-    // we know that data from kafka comes out in byte array serialized format
-    // By casting it as a string, we can read it
-    val df1 = df.withColumn("value", expr("cast(value as string)"))
+              
+    //processing 
+     val df1 = df.withColumn("value",expr("concat(value, ' sai')"))
 
-    //processing - adding a date stamp column to the data
-    val finaldf = df.withColumn("tdate", current_date)
-
+    //writing the data to kafka ssouttpk topic
     df1.writeStream
-          .format("console") //use console if you are writing to console
+          .format("kafka") //use console if you are writing to console
+          .option("kafka.bootstrap.servers","localhost:9092")
+          .option("topic","ssouttpk")
           .option("checkpointLocation","file:///F:/checkpoint")
           .start() //use start if you want to write to a location
           .awaitTermination()
+    
+    //writing the result to cassandra table
+//    df1.writeStream
+//          .foreachBatch{(df:DataFrame, id:Long)=>
+//            df.write.format("org.apache.spark.cassandra")
+//                    .option("spark.cassandra.connection.host","localhost")
+//                    .option("spark.cassandra.connection.port","9042")
+//                    .option("keyspace","zeyok")
+//                    .option("table","zeyotk")
+//                    .save()
+//            }
+//          .option("checkpointLocation","file:///F:/checkpoint")
+//          .start() //use start if you want to write to a location
+//          .awaitTermination()
 
   }
   }
+
